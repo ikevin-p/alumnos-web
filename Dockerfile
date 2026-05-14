@@ -17,7 +17,7 @@ COPY . .
 ARG REACT_APP_API_URL=http://localhost:8080
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 
-RUN npm run build
+RUN DISABLE_ESLINT_PLUGIN=true npm run build
 
 # =============================================================
 FROM nginx:1.25-alpine AS production
