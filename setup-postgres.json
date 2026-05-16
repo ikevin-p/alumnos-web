@@ -1,0 +1,14 @@
+{
+    "InstanceIds": ["i-0c9628b0e66743000"],
+    "DocumentName": "AWS-RunShellScript",
+    "Parameters": {
+        "commands": [
+            "sudo yum update -y",
+            "sudo yum install docker -y",
+            "sudo systemctl start docker",
+            "sudo systemctl enable docker",
+            "sudo docker run -d --name postgres_db --restart unless-stopped -e POSTGRES_DB=alumnos -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -v postgres_data:/var/lib/postgresql/data -p 5432:5432 postgres:16-alpine",
+            "sleep 5 && sudo docker ps"
+        ]
+    }
+}

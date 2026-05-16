@@ -1,4 +1,4 @@
-name: CI/CD Frontend - Innovatech Chile
+name: "CI/CD Frontend - Innovatech Chile"
 
 on:
   push:
@@ -7,79 +7,68 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: alumnos-web
-  CONTAINER_NAME: innovatech_frontend
+  IMAGE_TAG:  ${{ github.sha }}
 
 jobs:
-
   build-and-push:
-    name: Build y Push a Amazon ECR
+    name: "Build React → ECR"
     runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.build-image.outputs.image }}
-
     steps:
-      - name: Checkout del repositorio
+      - name: "Checkout código"
         uses: actions/checkout@v4
 
-      - name: Configurar credenciales AWS
+      - name: "Configurar credenciales AWS"
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Login a Amazon ECR
-        id: login-ecr
+      - name: "Login en Amazon ECR"
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag y push de imagen a ECR
-        id: build-image
+      - name: "Build y Push imagen Frontend"
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_WEB_URI: ${{ secrets.ECR_WEB_URI }}
         run: |
           docker build \
-            --build-arg REACT_APP_API_URL=${{ secrets.BACKEND_URL }} \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
-            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --tag $ECR_WEB_URI:$IMAGE_TAG \
+            --tag $ECR_WEB_URI:latest \
             .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          docker push $ECR_WEB_URI:$IMAGE_TAG
+          docker push $ECR_WEB_URI:latest
 
   deploy:
-    name: Deploy en EC2 Frontend via SSM
+    name: "Deploy Frontend en EC2"
     runs-on: ubuntu-latest
     needs: build-and-push
-
     steps:
-      - name: Configurar credenciales AWS
+      - name: "Configurar credenciales AWS"
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region:            ${{ secrets.AWS_REGION }}
 
-      - name: Login a Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Deploy en EC2 via SSM
+      - name: "Deploy Frontend en EC2 via SSM"
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_WEB_URI:  ${{ secrets.ECR_WEB_URI }}
+          EC2_WEB_ID:   ${{ secrets.EC2_WEB_ID }}
+          BACKEND_HOST: ${{ secrets.BACKEND_HOST }}
         run: |
           aws ssm send-command \
-            --instance-ids "${{ secrets.EC2_FRONTEND_ID }}" \
+            --instance-ids "$EC2_WEB_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands='[
-              "aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-              "docker pull ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}",
-              "docker stop ${{ env.CONTAINER_NAME }} || true",
-              "docker rm ${{ env.CONTAINER_NAME }} || true",
-              "docker run -d --name ${{ env.CONTAINER_NAME }} --restart unless-stopped -p 80:80 ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}"
-            ]' \
-            --region ${{ secrets.AWS_REGION }}
+            --comment "Deploy Frontend - $IMAGE_TAG" \
+            --parameters commands="[
+              'aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_WEB_URI',
+              'sudo docker pull $ECR_WEB_URI:latest',
+              'sudo docker stop alumnos-web 2>/dev/null || true',
+              'sudo docker rm   alumnos-web 2>/dev/null || true',
+              'sudo docker run -d --name alumnos-web --restart unless-stopped -p 80:80 -e BACKEND_HOST=$BACKEND_HOST $ECR_WEB_URI:latest',
+              'sudo docker image prune -f'
+            ]" \
+            --region "$AWS_REGION" \
+            --output text
