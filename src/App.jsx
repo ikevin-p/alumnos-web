@@ -201,6 +201,30 @@ const styles = {
     fontSize: '11px',
     borderTop: '1px solid rgba(255,255,255,0.05)',
   },
+  searchWrapper: {
+    position: 'relative',
+    marginBottom: '20px',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '14px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: COLORS.gray,
+    fontSize: '16px',
+    pointerEvents: 'none',
+  },
+  searchInput: {
+    width: '100%',
+    padding: '12px 16px 12px 42px',
+    background: 'rgba(255,255,255,0.08)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: '12px',
+    color: COLORS.white,
+    fontSize: '14px',
+    outline: 'none',
+    backdropFilter: 'blur(10px)',
+  },
 };
 
 const avatarColors = [COLORS.orange, COLORS.teal, COLORS.blue, '#8B5CF6', '#EC4899'];
@@ -213,6 +237,13 @@ export default function App() {
   const [alumnos, setAlumnos]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [connected, setConnected] = useState(false);
+  const [busqueda, setBusqueda]   = useState('');
+
+  const alumnosFiltrados = alumnos.filter(a =>
+    `${a.nombre} ${a.apellido} ${a.carrera || ''}`
+      .toLowerCase()
+      .includes(busqueda.toLowerCase())
+  );
 
   useEffect(() => {
     axios.get('/alumnos')
@@ -274,12 +305,28 @@ export default function App() {
             </div>
           </div>
 
+          {/* Buscador */}
+          <div style={styles.searchWrapper}>
+            <span style={styles.searchIcon}>🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o carrera..."
+              value={busqueda}
+              onChange={e => setBusqueda(e.target.value)}
+              style={styles.searchInput}
+            />
+          </div>
+
           {/* Tabla de alumnos */}
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
                 <p style={styles.cardTitle}>Listado de Alumnos</p>
-                <p style={styles.cardSub}>Datos obtenidos en tiempo real desde PostgreSQL</p>
+                <p style={styles.cardSub}>
+                  {busqueda
+                    ? `${alumnosFiltrados.length} resultado${alumnosFiltrados.length !== 1 ? 's' : ''} para "${busqueda}"`
+                    : 'Datos obtenidos en tiempo real desde PostgreSQL'}
+                </p>
               </div>
             </div>
 
@@ -288,8 +335,8 @@ export default function App() {
                 <div style={styles.spinner} />
                 <p style={{ color: COLORS.gray }}>Conectando con el backend...</p>
               </div>
-            ) : alumnos.length > 0 ? (
-              alumnos.map((a, i) => (
+            ) : alumnosFiltrados.length > 0 ? (
+              alumnosFiltrados.map((a, i) => (
                 <div key={a.id} style={styles.alumnoRow(i)}>
                   <div style={styles.avatar(avatarColors[i % avatarColors.length])}>
                     {getInitials(a.nombre, a.apellido)}
@@ -303,6 +350,12 @@ export default function App() {
                   )}
                 </div>
               ))
+            ) : busqueda ? (
+              <div style={styles.emptyState}>
+                <p style={{ fontSize: '32px', marginBottom: '12px' }}>🔍</p>
+                <p style={{ color: COLORS.white, fontWeight: '600' }}>Sin resultados</p>
+                <p style={{ fontSize: '13px', marginTop: '8px', color: COLORS.gray }}>No hay alumnos que coincidan con "{busqueda}"</p>
+              </div>
             ) : (
               <div style={styles.emptyState}>
                 <p style={{ fontSize: '32px', marginBottom: '12px' }}>⚠️</p>

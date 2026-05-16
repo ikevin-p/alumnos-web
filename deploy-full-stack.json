@@ -1,0 +1,20 @@
+{
+    "InstanceIds": ["i-0d55f1dfb3bb7734c"],
+    "DocumentName": "AWS-RunShellScript",
+    "Parameters": {
+        "commands": [
+            "sudo docker stop alumnos-app 2>/dev/null || true",
+            "sudo docker rm alumnos-app 2>/dev/null || true",
+            "sudo docker stop alumnos-datos 2>/dev/null || true",
+            "sudo docker rm alumnos-datos 2>/dev/null || true",
+            "sudo docker network create alumnos-network 2>/dev/null || true",
+            "aws ecr get-login-password --region us-east-1 | sudo docker login --username AWS --password-stdin 932111883716.dkr.ecr.us-east-1.amazonaws.com",
+            "sudo docker pull 932111883716.dkr.ecr.us-east-1.amazonaws.com/alumnos-datos:latest",
+            "sudo docker run -d --name alumnos-datos --restart unless-stopped --network alumnos-network -e POSTGRES_DB=alumnos -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -v pgdata:/var/lib/postgresql/data 932111883716.dkr.ecr.us-east-1.amazonaws.com/alumnos-datos:latest",
+            "sleep 15",
+            "sudo docker pull 932111883716.dkr.ecr.us-east-1.amazonaws.com/alumnos-app:latest",
+            "sudo docker run -d --name alumnos-app --restart unless-stopped --network alumnos-network -p 8080:8080 -e SPRING_DATASOURCE_URL=jdbc:postgresql://alumnos-datos:5432/alumnos -e SPRING_DATASOURCE_USERNAME=postgres -e SPRING_DATASOURCE_PASSWORD=postgres 932111883716.dkr.ecr.us-east-1.amazonaws.com/alumnos-app:latest",
+            "sleep 5 && sudo docker ps"
+        ]
+    }
+}
